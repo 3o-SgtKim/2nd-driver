@@ -1,12 +1,11 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
-const DURATION = 600;
+const DURATION = 800;
 
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
@@ -14,37 +13,50 @@ export function AnimatedSplashOverlay() {
 
   if (!visible) return null;
 
-  const splashKeyframe = new Keyframe({
+  const fadeOut = new Keyframe({
     0: {
+      opacity: 1,
       transform: [{ scale: 1 }],
-      opacity: 1,
     },
-    20: {
+    50: {
       opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
+      transform: [{ scale: 1.05 }],
+      easing: Easing.out(Easing.ease),
     },
     100: {
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      transform: [{ scale: 0.9 }],
+      easing: Easing.in(Easing.ease),
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const icon = (
+    <Image
+      style={styles.splashIcon}
+      source={require('@/assets/images/icon.png')}
+      contentFit="contain"
+    />
+  );
 
   return animate ? (
     <Animated.View
-      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
+      entering={fadeOut.duration(DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
         }
       })}
       style={styles.splashOverlay}>
-      {image}
+      {icon}
+      <View style={styles.splashTitle}>
+        <Animated.View
+          entering={new Keyframe({
+            0: { opacity: 1 },
+            100: { opacity: 0 },
+          }).duration(DURATION / 2)}>
+          <Animated.Text style={styles.splashTitleText}>2nd Driver</Animated.Text>
+        </Animated.View>
+      </View>
     </Animated.View>
   ) : (
     <View
@@ -54,95 +66,107 @@ export function AnimatedSplashOverlay() {
         });
       }}
       style={styles.splashOverlay}>
-      {image}
+      {icon}
+      <View style={styles.splashTitle}>
+        <Animated.Text style={styles.splashTitleText}>2nd Driver</Animated.Text>
+      </View>
     </View>
   );
 }
 
-const keyframe = new Keyframe({
+const enterIcon = new Keyframe({
   0: {
-    transform: [{ scale: INITIAL_SCALE_FACTOR }],
+    transform: [{ scale: 0.5 }],
+    opacity: 0,
+  },
+  60: {
+    transform: [{ scale: 1.1 }],
+    opacity: 1,
+    easing: Easing.out(Easing.ease),
   },
   100: {
     transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
+    opacity: 1,
+    easing: Easing.elastic(0.8),
   },
 });
 
-const logoKeyframe = new Keyframe({
+const enterText = new Keyframe({
   0: {
-    transform: [{ scale: 1.3 }],
     opacity: 0,
+    transform: [{ translateY: 10 }],
   },
-  40: {
-    transform: [{ scale: 1.3 }],
+  50: {
     opacity: 0,
-    easing: Easing.elastic(0.7),
+    transform: [{ translateY: 10 }],
   },
   100: {
     opacity: 1,
-    transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
-  },
-});
-
-const glowKeyframe = new Keyframe({
-  0: {
-    transform: [{ rotateZ: '0deg' }],
-  },
-  100: {
-    transform: [{ rotateZ: '7200deg' }],
+    transform: [{ translateY: 0 }],
+    easing: Easing.out(Easing.ease),
   },
 });
 
 export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
-      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+      <Animated.View entering={enterIcon.duration(DURATION)} style={styles.iconWrapper}>
+        <Image
+          style={styles.iconImage}
+          source={require('@/assets/images/icon.png')}
+          contentFit="contain"
+        />
       </Animated.View>
-
-      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
-      <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
-      </Animated.View>
+      <Animated.Text entering={enterText.duration(DURATION)} style={styles.iconLabel}>
+        2nd Driver
+      </Animated.Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  imageContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  glow: {
-    width: 201,
-    height: 201,
-    position: 'absolute',
-  },
-  iconContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 128,
-    height: 128,
-    zIndex: 100,
-  },
-  image: {
-    width: 76,
-    height: 71,
-  },
-  background: {
-    borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
-    width: 128,
-    height: 128,
-    position: 'absolute',
-  },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#3C3CDC',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+    gap: 16,
+  },
+  splashIcon: {
+    width: 140,
+    height: 140,
+    borderRadius: 30,
+  },
+  splashTitle: {},
+  splashTitleText: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    zIndex: 100,
+  },
+  iconWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  iconImage: {
+    width: 100,
+    height: 100,
+  },
+  iconLabel: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    opacity: 0.8,
   },
 });

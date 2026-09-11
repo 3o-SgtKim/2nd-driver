@@ -11,20 +11,45 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      labelStyle={{ selected: { color: colors.text } }}
+      labelVisibilityMode="labeled">
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Início</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
+          sf={{ default: 'house', selected: 'house.fill' }}
+          md="home"
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="fuel">
+        <NativeTabs.Trigger.Label>Combustível</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
+          sf={{ default: 'fuelpump', selected: 'fuelpump.fill' }}
+          md="local_gas_station"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="maintenance">
+        <NativeTabs.Trigger.Label>Manutenção</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'wrench.adjustable', selected: 'wrench.adjustable.fill' }}
+          md="build"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="reports">
+        <NativeTabs.Trigger.Label>Relatórios</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }}
+          md="bar_chart"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="vehicle">
+        <NativeTabs.Trigger.Label>Veículo</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'car', selected: 'car.fill' }}
+          md="directions_car"
         />
       </NativeTabs.Trigger>
     </NativeTabs>

@@ -1,98 +1,181 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { LogRow } from '@/components/log-row';
+import { NeedsVehicle } from '@/components/needs-vehicle';
+import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { VehicleSelector } from '@/components/vehicle-selector';
+import { AccentColors, Spacing } from '@/constants/theme';
+import {
+  formatCurrency,
+  formatDateDisplay,
+  formatNumber,
+  getAllNextServices,
+  getFuelEconomy,
+  getLastOdometer,
+  getLatestFuelLog,
+} from '@/domain/stats';
+import { FUEL_TYPE_LABELS, getMaintenanceLabel } from '@/domain/types';
+import { useGarage } from '@/hooks/use-garage';
+import { useTheme } from '@/hooks/use-theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
+export default function HomeScreen() {
+  const garage = useGarage();
+  const theme = useTheme();
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+
+  if (garage.loading) {
     return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+      <Screen scroll={false}>
+        <ActivityIndicator color={theme.text} />
+      </Screen>
     );
   }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+
+  if (!garage.vehicle) {
+    return (
+      <Screen>
+        <ThemedText type="subtitle">Início</ThemedText>
+        <NeedsVehicle />
+      </Screen>
+    );
+  }
+
+  const lastOdometer = getLastOdometer(garage);
+  const latestFuel = getLatestFuelLog(garage.fuelLogs);
+  const economy = getFuelEconomy(garage.fuelLogs, garage.vehicle);
+  const nextServices = getAllNextServices(garage.maintenanceLogs, lastOdometer);
+  const unit = garage.vehicle.odometerUnit;
+
+  const fuelAccent = AccentColors.fuel;
+  const maintAccent = AccentColors.maintenance;
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <Screen topHeader={<VehicleSelector />}>
+      <View style={styles.header}>
+        <ThemedText themeColor="textSecondary">
+          {lastOdometer != null ? `${formatNumber(lastOdometer)} ${unit}` : 'Resumo do veículo'}
+        </ThemedText>
+      </View>
+
+      {/* 1. Consumo */}
+      <AccentCard
+        accent="fuel"
+        title="Consumo"
+        dark={dark}>
+        <ThemedText
+          type="subtitle"
+          style={{
+            color: dark ? fuelAccent.textDark : fuelAccent.text,
+            fontSize: 28,
+            lineHeight: 34,
+          }}>
+          {economy
+            ? `${formatNumber(economy.value, 1)} ${economy.unitLabel}`
+            : '—'}
+        </ThemedText>
+        {!economy && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Precisa de 2 tanques cheios para calcular
+          </ThemedText>
+        )}
+      </AccentCard>
+
+      {/* 2. Próximas manutenções */}
+      <View style={styles.section}>
+        <ThemedText type="smallBold">Próximas manutenções</ThemedText>
+        {nextServices.length === 0 ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            Nenhuma pendência
+          </ThemedText>
+        ) : (
+          nextServices.map((svc) => (
+            <Link key={svc.log.id} href={`/maintenance/${svc.log.id}`} asChild>
+              <Pressable>
+                <LogRow
+                  accent="maintenance"
+                  title={getMaintenanceLabel(svc.log.maintenanceItemId, svc.log.customTitle)}
+                  subtitle={svc.dueLabel}
+                />
+              </Pressable>
+            </Link>
+          ))
+        )}
+      </View>
+
+      {/* 3. Último abastecimento */}
+      <View style={styles.section}>
+        <ThemedText type="smallBold">Último abastecimento</ThemedText>
+        {latestFuel ? (
+          <Link href={`/fuel/${latestFuel.id}`} asChild>
+            <Pressable>
+              <LogRow
+                accent="fuel"
+                title={`${FUEL_TYPE_LABELS[latestFuel.fuelType] ?? latestFuel.fuelType} · ${formatDateDisplay(latestFuel.date)}`}
+                subtitle={`${formatNumber(latestFuel.odometer)} ${unit} · ${formatNumber(latestFuel.volume, 1)} ${garage.vehicle.fuelUnit}`}
+                meta={formatCurrency(latestFuel.totalCost, garage.vehicle.currency)}
+              />
+            </Pressable>
+          </Link>
+        ) : (
+          <ThemedText type="small" themeColor="textSecondary">
+            Nenhum abastecimento ainda
+          </ThemedText>
+        )}
+      </View>
+    </Screen>
   );
 }
 
-export default function HomeScreen() {
+function AccentCard({
+  accent,
+  title,
+  dark,
+  children,
+}: {
+  accent: keyof typeof AccentColors;
+  title: string;
+  dark: boolean;
+  children: ReactNode;
+}) {
+  const colors = AccentColors[accent];
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <View
+      style={[
+        styles.accentCard,
+        {
+          backgroundColor: dark ? colors.surfaceDark : colors.surface,
+          borderColor: dark ? colors.borderDark : colors.border,
+        },
+      ]}>
+      <ThemedText
+        type="small"
+        style={{ color: dark ? colors.textDark : colors.text, fontWeight: '600' }}>
+        {title}
+      </ThemedText>
+      {children}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+  header: {
+    gap: Spacing.one,
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+  accentCard: {
+    gap: Spacing.one,
+    padding: Spacing.three,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  section: {
+    gap: Spacing.two,
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  pressed: {
+    opacity: 0.7,
   },
 });
