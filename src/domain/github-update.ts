@@ -6,7 +6,14 @@ export type GithubUpdate = {
   tag: string;
   current: string;
   url: string;
+  apkUrl: string | null;
   name: string | null;
+};
+
+type GithubAsset = {
+  name?: string;
+  browser_download_url?: string;
+  content_type?: string;
 };
 
 type GithubReleaseJson = {
@@ -15,7 +22,17 @@ type GithubReleaseJson = {
   name?: string | null;
   draft?: boolean;
   prerelease?: boolean;
+  assets?: GithubAsset[];
 };
+
+export function pickApkUrl(assets?: GithubAsset[]): string | null {
+  if (!assets?.length) return null;
+  const apk = assets.find((asset) => {
+    const name = asset.name?.toLowerCase() ?? '';
+    return name.endsWith('.apk') || asset.content_type === 'application/vnd.android.package-archive';
+  });
+  return apk?.browser_download_url?.trim() || null;
+}
 
 export function parseVersion(raw: string): number[] {
   return raw
@@ -75,6 +92,7 @@ export async function checkGithubRelease(): Promise<GithubUpdate | null> {
       tag,
       current,
       url,
+      apkUrl: pickApkUrl(data.assets),
       name: data.name?.trim() || null,
     };
   } catch {

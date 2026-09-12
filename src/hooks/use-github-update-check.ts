@@ -2,13 +2,42 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { Alert, AppState, Linking } from 'react-native';
 
-import { checkGithubRelease } from '@/domain/github-update';
+import { downloadAndInstallApk } from '@/domain/apk-install';
+import { checkGithubRelease, type GithubUpdate } from '@/domain/github-update';
 import { UPDATE_DISMISSED_TAG_KEY } from '@/storage/keys';
 
 let inFlight = false;
+let installing = false;
+
+async function installUpdate(update: GithubUpdate) {
+  if (installing) return;
+  installing = true;
+
+  try {
+    if (!update.apkUrl) {
+      await Linking.openURL(update.url);
+      return;
+    }
+
+    await downloadAndInstallApk(update.apkUrl, update.url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Não foi possível baixar a atualização.';
+    Alert.alert('Atualização', message, [
+      { text: 'OK', style: 'cancel' },
+      {
+        text: 'Abrir no GitHub',
+        onPress: () => {
+          void Linking.openURL(update.url);
+        },
+      },
+    ]);
+  } finally {
+    installing = false;
+  }
+}
 
 async function promptIfNewer() {
-  if (inFlight) return;
+  if (inFlight || installing) return;
   inFlight = true;
 
   try {
@@ -22,7 +51,7 @@ async function promptIfNewer() {
 
     Alert.alert(
       'Atualização disponível',
-      `A versão ${label} já saiu no GitHub. Você está na ${update.current}.`,
+      `A versão ${label} já saiu. Você está na ${update.current}.\n\nO app baixa o APK e abre o instalador do Android. Seus dados continuam salvos.`,
       [
         {
           text: 'Agora não',
@@ -32,9 +61,9 @@ async function promptIfNewer() {
           },
         },
         {
-          text: 'Ver atualização',
+          text: 'Atualizar',
           onPress: () => {
-            void Linking.openURL(update.url);
+            void installUpdate(update);
           },
         },
       ]
