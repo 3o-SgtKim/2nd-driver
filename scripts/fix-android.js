@@ -26,3 +26,28 @@ if (fs.existsSync(gradleProps)) {
     console.log('[fix-android] gradle.properties already has java.home');
   }
 }
+
+// Debug builds get a different package so they can sit next to the release APK.
+const appGradle = path.join(androidDir, 'app', 'build.gradle');
+if (fs.existsSync(appGradle)) {
+  let gradle = fs.readFileSync(appGradle, 'utf8');
+  if (!gradle.includes('applicationIdSuffix')) {
+    gradle = gradle.replace(
+      /debug \{\s*\n\s*signingConfig signingConfigs.debug/,
+      'debug {\n            applicationIdSuffix ".debug"\n            signingConfig signingConfigs.debug'
+    );
+    fs.writeFileSync(appGradle, gradle);
+    console.log('[fix-android] debug applicationIdSuffix .debug');
+  }
+}
+
+const debugStringsDir = path.join(androidDir, 'app', 'src', 'debug', 'res', 'values');
+const debugStrings = path.join(debugStringsDir, 'strings.xml');
+if (!fs.existsSync(debugStrings)) {
+  fs.mkdirSync(debugStringsDir, { recursive: true });
+  fs.writeFileSync(
+    debugStrings,
+    '<resources>\n  <string name="app_name">2nd Driver Dev</string>\n</resources>\n'
+  );
+  console.log('[fix-android] debug app name set to 2nd Driver Dev');
+}

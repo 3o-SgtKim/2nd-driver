@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { parseLocaleNumber, toInputNumber } from '@/components/form-utils';
+import { FormHero, FormSection } from '@/components/form-section';
 import { Chip, Field, PrimaryButton, TextField } from '@/components/forms';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -105,41 +106,60 @@ export default function EditFuelScreen() {
 
   return (
     <Screen>
-      <Field label={`Odômetro (${garage.vehicle?.odometerUnit ?? 'km'})`}>
-        <TextField value={odometer} onChangeText={setOdometer} keyboardType="decimal-pad" />
-      </Field>
+      <FormHero
+        eyebrow="Editar registro"
+        title="Abastecimento"
+        accent="fuel"
+        imageUri={garage.vehicle?.photoUri}
+        outlined
+        meta={
+          log
+            ? [{ label: 'Registrado em', value: isoToDisplay(log.date) }]
+            : undefined
+        }
+      />
 
-      <Field label="Tipo de combustível">
-        <View style={styles.chips}>
-          {FUEL_TYPES.map((type) => (
-            <Chip
-              key={type}
-              label={FUEL_TYPE_LABELS[type]}
-              selected={fuelType === type}
-              onPress={() => setFuelType(type)}
-            />
-          ))}
-        </View>
-      </Field>
+      <FormSection title="Leitura">
+        <Field label={`Odômetro (${garage.vehicle?.odometerUnit ?? 'km'})`}>
+          <TextField value={odometer} onChangeText={setOdometer} keyboardType="decimal-pad" />
+        </Field>
+      </FormSection>
 
-      <Field label={`Volume (${garage.vehicle?.fuelUnit ?? 'L'})`}>
-        <TextField value={volume} onChangeText={setVolume} keyboardType="decimal-pad" />
-      </Field>
-      <Field label="Valor total">
-        <TextField value={totalCost} onChangeText={setTotalCost} keyboardType="decimal-pad" />
-      </Field>
-      <Field label="Tanque cheio?">
-        <View style={styles.chips}>
-          <Chip label="Sim" selected={isFullTank} onPress={() => setIsFullTank(true)} />
-          <Chip label="Não" selected={!isFullTank} onPress={() => setIsFullTank(false)} />
-        </View>
-      </Field>
-      <Field label="Observações">
-        <TextField value={notes} onChangeText={setNotes} multiline />
-      </Field>
-      <Field label="Data (dd/mm/aaaa)">
-        <TextField value={date} onChangeText={setDate} />
-      </Field>
+      <FormSection title="Abastecimento">
+        <Field label="Tipo de combustível">
+          <View style={styles.chips}>
+            {FUEL_TYPES.map((type) => (
+              <Chip
+                key={type}
+                label={FUEL_TYPE_LABELS[type]}
+                selected={fuelType === type}
+                onPress={() => setFuelType(type)}
+              />
+            ))}
+          </View>
+        </Field>
+        <Field label={`Volume (${garage.vehicle?.fuelUnit ?? 'L'})`}>
+          <TextField value={volume} onChangeText={setVolume} keyboardType="decimal-pad" />
+        </Field>
+        <Field label="Valor total">
+          <TextField value={totalCost} onChangeText={setTotalCost} keyboardType="decimal-pad" />
+        </Field>
+        <Field label="Tanque cheio?">
+          <View style={styles.chips}>
+            <Chip label="Sim" selected={isFullTank} onPress={() => setIsFullTank(true)} />
+            <Chip label="Não" selected={!isFullTank} onPress={() => setIsFullTank(false)} />
+          </View>
+        </Field>
+      </FormSection>
+
+      <FormSection title="Detalhes">
+        <Field label="Observações">
+          <TextField value={notes} onChangeText={setNotes} multiline />
+        </Field>
+        <Field label="Data (dd/mm/aaaa)">
+          <TextField value={date} onChangeText={setDate} />
+        </Field>
+      </FormSection>
 
       <PrimaryButton label={saving ? 'Salvando…' : 'Salvar'} onPress={onSave} disabled={saving} />
       <PrimaryButton label="Excluir" onPress={onDelete} tone="danger" />

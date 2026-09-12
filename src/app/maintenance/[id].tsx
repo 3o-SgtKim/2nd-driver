@@ -1,14 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { parseLocaleNumber, toInputNumber } from '@/components/form-utils';
+import { FormHero, FormSection } from '@/components/form-section';
 import { Chip, Field, PrimaryButton, TextField } from '@/components/forms';
 import { MaintenanceCategoryPicker } from '@/components/maintenance-category-picker';
+import { FieldWithPlan } from '@/components/plan-fill-button';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { computeNextDue, displayToIso, formatNumber, isoToDisplay, todayIsoDate } from '@/domain/stats';
+import { computeNextDue, displayToIso, getScheduleEntry, isoToDisplay, todayIsoDate } from '@/domain/stats';
 import { useGarage } from '@/hooks/use-garage';
 
 export default function EditMaintenanceScreen() {
@@ -57,6 +59,11 @@ export default function EditMaintenanceScreen() {
   }
 
   const isOther = selectedItemId === 'other';
+  const scheduleEntry = getScheduleEntry(
+    garage.vehicle?.maintenanceSchedule,
+    selectedItemId,
+    customTitle,
+  );
 
   async function onSave() {
     if (!log || !selectedItemId) {
@@ -133,19 +140,34 @@ export default function EditMaintenanceScreen() {
 
   return (
     <Screen>
-      <MaintenanceCategoryPicker
-        selectedItemId={selectedItemId}
-        onSelect={setSelectedItemId}
+      <FormHero
+        eyebrow="Editar registro"
+        title="Manutenção"
+        accent="maintenance"
+        imageUri={garage.vehicle?.photoUri}
+        outlined
+        meta={
+          log
+            ? [{ label: 'Registrado em', value: isoToDisplay(log.date) }]
+            : undefined
+        }
       />
 
-      {isOther && (
-        <Field label="Título do serviço">
-          <TextField value={customTitle} onChangeText={setCustomTitle} placeholder="Descreva o serviço…" />
-        </Field>
-      )}
+      <FormSection title="Serviço">
+        <MaintenanceCategoryPicker
+          selectedItemId={selectedItemId}
+          onSelect={setSelectedItemId}
+        />
+        {isOther ? (
+          <Field label="Título do serviço">
+            <TextField value={customTitle} onChangeText={setCustomTitle} placeholder="Descreva o serviço…" />
+          </Field>
+        ) : null}
+      </FormSection>
 
       {selectedItemId && (
         <>
+          <FormSection title="Registro">
           <Field label={`Odômetro (${garage.vehicle?.odometerUnit ?? 'km'})`}>
             <TextField value={odometer} onChangeText={setOdometer} keyboardType="decimal-pad" />
           </Field>
@@ -153,39 +175,38 @@ export default function EditMaintenanceScreen() {
             <TextField value={cost} onChangeText={setCost} keyboardType="decimal-pad" />
           </Field>
           <Field label="Próximo odômetro (opcional)">
-            <TextField
-              value={nextDueOdometer}
-              onChangeText={setNextDueOdometer}
-              keyboardType="decimal-pad"
-            />
+            <FieldWithPlan
+              showPlan={scheduleEntry != null}
+              onPlan={() => {
+                if (scheduleEntry?.intervalKm == null) {
+                  Alert.alert('Plano', 'Este serviço não tem intervalo de km no plano do veículo.');
+                  return;
+                }
+                const odo = parseLocaleNumber(odometer);
+                const next = computeNextDue(odo ?? 0, todayIsoDate(), scheduleEntry.intervalKm, undefined);
+                if (next.nextOdometer != null) setNextDueOdometer(toInputNumber(next.nextOdometer));
+              }}>
+              <TextField
+                value={nextDueOdometer}
+                onChangeText={setNextDueOdometer}
+                keyboardType="decimal-pad"
+              />
+            </FieldWithPlan>
           </Field>
           <Field label="Próxima data (opcional, dd/mm/aaaa)">
-            <View style={styles.fieldWithAutoFill}>
-              <View style={styles.fieldInputFlex}>
-                <TextField value={nextDueDate} onChangeText={setNextDueDate} />
-              </View>
-              {(() => {
-                const schedule = garage.vehicle?.maintenanceSchedule;
-                const scheduleKey = isOther && customTitle.trim()
-                  ? `other:${customTitle.trim()}`
-                  : selectedItemId;
-                const entry = schedule?.find((e) => e.maintenanceItemId === scheduleKey);
-                if (!entry) return null;
-                return (
-                  <Pressable
-                    onPress={() => {
-                      const odo = parseLocaleNumber(odometer);
-                      const dateIso = displayToIso(date) ?? todayIsoDate();
-                      const next = computeNextDue(odo ?? 0, dateIso, entry.intervalKm, entry.intervalMonths);
-                      if (next.nextOdometer != null) setNextDueOdometer(toInputNumber(next.nextOdometer));
-                      if (next.nextDateIso) setNextDueDate(isoToDisplay(next.nextDateIso));
-                    }}
-                    style={({ pressed }) => [styles.autoFillBtn, pressed && styles.pressed]}>
-                    <ThemedText type="small" style={styles.autoFillLabel}>⚡ Plano</ThemedText>
-                  </Pressable>
-                );
-              })()}
-            </View>
+            <FieldWithPlan
+              showPlan={scheduleEntry != null}
+              onPlan={() => {
+                if (scheduleEntry?.intervalMonths == null) {
+                  Alert.alert('Plano', 'Este serviço não tem intervalo de tempo no plano do veículo.');
+                  return;
+                }
+                const dateIso = displayToIso(date) ?? todayIsoDate();
+                const next = computeNextDue(0, dateIso, undefined, scheduleEntry.intervalMonths);
+                if (next.nextDateIso) setNextDueDate(isoToDisplay(next.nextDateIso));
+              }}>
+              <TextField value={nextDueDate} onChangeText={setNextDueDate} />
+            </FieldWithPlan>
           </Field>
 
           {(nextDueOdometer.trim() || nextDueDate.trim()) && (
@@ -206,12 +227,16 @@ export default function EditMaintenanceScreen() {
             </Field>
           )}
 
+          </FormSection>
+
+          <FormSection title="Detalhes">
           <Field label="Observações">
             <TextField value={notes} onChangeText={setNotes} multiline />
           </Field>
           <Field label="Data (dd/mm/aaaa)">
             <TextField value={date} onChangeText={setDate} />
           </Field>
+          </FormSection>
 
           <PrimaryButton label={saving ? 'Salvando…' : 'Salvar'} onPress={onSave} disabled={saving} />
           <PrimaryButton label="Excluir" onPress={onDelete} tone="danger" />
@@ -229,29 +254,5 @@ const styles = StyleSheet.create({
   },
   reminderHint: {
     marginTop: 4,
-  },
-  fieldWithAutoFill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  fieldInputFlex: {
-    flex: 1,
-  },
-  autoFillBtn: {
-    backgroundColor: 'rgba(59, 130, 246, 0.10)',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  autoFillLabel: {
-    color: '#3B82F6',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

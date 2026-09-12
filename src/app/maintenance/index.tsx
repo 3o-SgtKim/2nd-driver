@@ -1,13 +1,16 @@
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
+import { Cluster } from '@/components/cluster';
+import { EmptyState } from '@/components/empty-state';
 import { FabButton } from '@/components/forms';
 import { LogRow } from '@/components/log-row';
+import { FadeIn } from '@/components/motion';
 import { NeedsVehicle } from '@/components/needs-vehicle';
+import { PageHeader } from '@/components/page-header';
 import { Screen } from '@/components/screen';
-import { ThemedText } from '@/components/themed-text';
 import { VehicleSelector } from '@/components/vehicle-selector';
-import { Spacing } from '@/constants/theme';
+import { AccentColors, Spacing } from '@/constants/theme';
 import { formatCurrency, formatDateDisplay, formatNumber } from '@/domain/stats';
 import { getMaintenanceLabel } from '@/domain/types';
 import { useGarage } from '@/hooks/use-garage';
@@ -29,7 +32,7 @@ export default function MaintenanceListScreen() {
   if (!garage.vehicle) {
     return (
       <Screen>
-        <ThemedText type="subtitle">Manutenção</ThemedText>
+        <PageHeader title="Manutenção" subtitle="Cadastre um veículo para começar." />
         <NeedsVehicle />
       </Screen>
     );
@@ -51,37 +54,53 @@ export default function MaintenanceListScreen() {
 
   return (
     <Screen topHeader={<VehicleSelector />}>
-      <ThemedText type="subtitle">Manutenção</ThemedText>
+      <Cluster
+        eyebrow="Registros"
+        title="Manutenção"
+        accent="maintenance"
+        imageUri={garage.vehicle.photoUri}
+        outlined
+        meta={[
+          {
+            label: 'Neste veículo',
+            value: `${logs.length} serviço${logs.length === 1 ? '' : 's'}`,
+          },
+        ]}
+      />
 
       {logs.length === 0 ? (
-        <ThemedText themeColor="textSecondary">
-          Nenhuma manutenção registrada.
-        </ThemedText>
+        <EmptyState
+          icon="construct-outline"
+          title="Nenhuma manutenção"
+          subtitle="Toque no botão abaixo para registrar o primeiro serviço."
+          accent={AccentColors.maintenance.solid}
+        />
       ) : (
         <View style={styles.list}>
-          {logs.map((log) => {
+          {logs.map((log, index) => {
             const label = getMaintenanceLabel(log.maintenanceItemId, log.customTitle);
             return (
-              <LogRow
-                key={log.id}
-                accent="maintenance"
-                title={label}
-                subtitle={`${formatDateDisplay(log.date)} · ${formatNumber(log.odometer)} ${unit}`}
-                meta={
-                  log.cost != null
-                    ? formatCurrency(log.cost, garage.vehicle!.currency)
-                    : undefined
-                }
-                onPress={() => router.push(`/maintenance/${log.id}`)}
-                onDelete={() => confirmDelete(log.id)}
-              />
+              <FadeIn key={log.id} delay={index * 40}>
+                <LogRow
+                  accent="maintenance"
+                  title={label}
+                  subtitle={`${formatDateDisplay(log.date)} · ${formatNumber(log.odometer)} ${unit}`}
+                  meta={
+                    log.cost != null
+                      ? formatCurrency(log.cost, garage.vehicle!.currency)
+                      : undefined
+                  }
+                  onPress={() => router.push(`/maintenance/${log.id}`)}
+                  onDelete={() => confirmDelete(log.id)}
+                />
+              </FadeIn>
             );
           })}
         </View>
       )}
 
       <FabButton
-        label="+ Nova manutenção"
+        label="Nova manutenção"
         accent="maintenance"
         onPress={() => router.push('/maintenance/new')}
       />

@@ -127,7 +127,7 @@ export function AnimatedIcon() {
 const styles = StyleSheet.create({
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#3C3CDC',
+    backgroundColor: '#161410',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

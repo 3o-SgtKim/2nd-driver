@@ -1,20 +1,16 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/app-icon';
+import { PressableScale } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { VehiclePhoto } from '@/components/vehicle-photo';
+import { Chrome, Radius, Shadows, Spacing } from '@/constants/theme';
 import { getVehicleDisplayName } from '@/domain/types';
 import { useGarage } from '@/hooks/use-garage';
-import { useTheme } from '@/hooks/use-theme';
 
-/**
- * Centered vehicle switcher.
- * Shows current vehicle name + ▼. Tapping opens a list to switch vehicles.
- */
 export function VehicleSelector() {
   const garage = useGarage();
-  const theme = useTheme();
   const [open, setOpen] = useState(false);
 
   if (garage.loading || garage.vehicles.length === 0) return null;
@@ -32,12 +28,11 @@ export function VehicleSelector() {
       <Pressable
         onPress={() => hasMultiple && setOpen(true)}
         style={({ pressed }) => [styles.trigger, hasMultiple && pressed && styles.pressed]}>
+        <VehiclePhoto uri={current?.photoUri} size={22} radius={8} iconColor={Chrome.text} />
         <ThemedText type="smallBold" style={styles.triggerText} numberOfLines={1}>
           {current ? getVehicleDisplayName(current) : 'Selecionar'}
         </ThemedText>
-        {hasMultiple && (
-          <ThemedText style={[styles.arrow, { color: theme.textSecondary }]}>▼</ThemedText>
-        )}
+        {hasMultiple && <AppIcon name="chevron-down" size={14} color={Chrome.muted} />}
       </Pressable>
 
       <Modal
@@ -47,33 +42,26 @@ export function VehicleSelector() {
         onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <View style={styles.dropdownAnchor}>
-            <ThemedView
-              type="backgroundElement"
-              style={[styles.dropdown, { borderColor: theme.backgroundSelected }]}>
+            <View style={[styles.dropdown, Shadows.raised]}>
               {garage.vehicles.map((v) => {
                 const isActive = v.id === garage.selectedVehicleId;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={v.id}
                     onPress={() => handleSelect(v.id)}
-                    style={({ pressed }) => [
-                      styles.row,
-                      isActive && styles.rowActive,
-                      pressed && styles.pressed,
-                    ]}>
+                    style={[styles.row, isActive && styles.rowActive]}>
+                    <VehiclePhoto uri={v.photoUri} size={28} radius={8} iconColor={Chrome.text} />
                     <ThemedText
                       type={isActive ? 'smallBold' : 'small'}
                       numberOfLines={1}
-                      style={styles.rowName}>
+                      style={[styles.rowName, { color: Chrome.text }]}>
                       {getVehicleDisplayName(v)}
                     </ThemedText>
-                    {isActive && (
-                      <ThemedText style={styles.check}>✓</ThemedText>
-                    )}
-                  </Pressable>
+                    {isActive && <AppIcon name="checkmark" size={18} color="#60A5FA" />}
+                  </PressableScale>
                 );
               })}
-            </ThemedView>
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -85,25 +73,23 @@ const styles = StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    backgroundColor: Chrome.surface,
   },
   triggerText: {
     fontSize: 15,
-    maxWidth: 240,
-  },
-  arrow: {
-    fontSize: 10,
+    maxWidth: 220,
+    color: Chrome.text,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.75,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: 120,
@@ -113,14 +99,11 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   dropdown: {
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
+    backgroundColor: Chrome.surface,
     padding: Spacing.one,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: Chrome.line,
   },
   row: {
     flexDirection: 'row',
@@ -128,18 +111,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: Radius.md,
+    gap: 10,
   },
   rowActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.10)',
+    backgroundColor: 'rgba(96, 165, 250, 0.16)',
   },
   rowName: {
     fontSize: 15,
     flex: 1,
-  },
-  check: {
-    fontSize: 16,
-    color: '#3B82F6',
-    marginLeft: 8,
   },
 });

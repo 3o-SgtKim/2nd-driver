@@ -1,28 +1,27 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
+import { Cluster } from '@/components/cluster';
+import { EmptyState } from '@/components/empty-state';
+import { FormSection } from '@/components/form-section';
 import { Chip } from '@/components/forms';
+import { PageHeader } from '@/components/page-header';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { VehicleSelector } from '@/components/vehicle-selector';
-import { AccentColors, Spacing } from '@/constants/theme';
+import { AccentColors, Radius, Shadows, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import {
-  displayToIso,
   formatCurrency,
   formatDateDisplay,
   formatNumber,
   getFuelEconomy,
-  getLastOdometer,
   tireCorrectionFactor,
-  todayIsoDate,
 } from '@/domain/stats';
 import {
   FUEL_TYPE_LABELS,
   getMaintenanceLabel,
-  type FuelLog,
   type FuelType,
-  type MaintenanceLog,
 } from '@/domain/types';
 import { useGarage } from '@/hooks/use-garage';
 
@@ -85,8 +84,7 @@ export default function ReportsScreen() {
   if (!vehicle) {
     return (
       <Screen>
-        <ThemedText type="subtitle">Relatórios</ThemedText>
-        <ThemedText themeColor="textSecondary">Cadastre um veículo para ver relatórios.</ThemedText>
+        <PageHeader title="Relatórios" subtitle="Cadastre um veículo para ver relatórios." />
       </Screen>
     );
   }
@@ -128,9 +126,41 @@ export default function ReportsScreen() {
 
   return (
     <Screen topHeader={<VehicleSelector />}>
-      <ThemedText type="subtitle">Relatórios</ThemedText>
+      <Cluster
+        eyebrow="Custo total"
+        title={formatCurrency(totalCost, vehicle.currency)}
+        accent="maintenance"
+        size="display"
+        imageUri={vehicle.photoUri}>
+        {totalCost > 0 ? (
+          <>
+            <View style={styles.splitTrack}>
+              <View style={[styles.splitFuel, { flex: Math.max(totalFuelCost, 0.01) }]} />
+              <View style={[styles.splitMaint, { flex: Math.max(totalMaintCost, 0.01) }]} />
+            </View>
+            <View style={styles.heroMeta}>
+              <View style={styles.heroMetaItem}>
+                <ThemedText type="eyebrow" style={styles.heroMetaLabel}>
+                  Combustível
+                </ThemedText>
+                <ThemedText type="smallBold" style={styles.heroMetaFuel}>
+                  {formatCurrency(totalFuelCost, vehicle.currency)}
+                </ThemedText>
+              </View>
+              <View style={styles.heroMetaDivider} />
+              <View style={styles.heroMetaItem}>
+                <ThemedText type="eyebrow" style={styles.heroMetaLabel}>
+                  Manutenção
+                </ThemedText>
+                <ThemedText type="smallBold" style={styles.heroMetaMaint}>
+                  {formatCurrency(totalMaintCost, vehicle.currency)}
+                </ThemedText>
+              </View>
+            </View>
+          </>
+        ) : null}
+      </Cluster>
 
-      {/* Period selector */}
       <View style={styles.periodRow}>
         {PERIODS.map((p) => (
           <Chip
@@ -142,39 +172,48 @@ export default function ReportsScreen() {
         ))}
       </View>
 
-      {/* Overview cards */}
-      <View style={styles.cardGrid}>
-        <StatMini label="Custo total" value={formatCurrency(totalCost, vehicle.currency)} />
-        <StatMini
-          label="Combustível"
-          value={formatCurrency(totalFuelCost, vehicle.currency)}
-          color={dark ? fuelColor.textDark : fuelColor.text}
-        />
-        <StatMini
-          label="Manutenção"
-          value={formatCurrency(totalMaintCost, vehicle.currency)}
-          color={dark ? maintColor.textDark : maintColor.text}
-        />
-        <StatMini
+      <View style={styles.tileRow}>
+        <StatTile
           label="Abastecimentos"
           value={String(fuelLogs.length)}
+          color={dark ? fuelColor.textDark : fuelColor.text}
         />
-        <StatMini
+        <StatTile
           label="Manutenções"
           value={String(maintLogs.length)}
-        />
-        <StatMini
-          label="Volume total"
-          value={`${formatNumber(totalFuelVolume, 1)} ${vehicle.fuelUnit}`}
+          color={dark ? maintColor.textDark : maintColor.text}
         />
       </View>
-
-      {/* Consumption */}
-      <StatMini
-        label="Consumo médio"
-        value={economy ? `${formatNumber(economy.value, 1)} ${economy.unitLabel}` : '—'}
-        color={dark ? fuelColor.textDark : fuelColor.text}
+      <StatTile
+        label="Volume total"
+        value={`${formatNumber(totalFuelVolume, 1)} ${vehicle.fuelUnit}`}
       />
+
+      <FormSection title="Médias">
+        <MetricRow
+          label="Consumo médio"
+          value={economy ? `${formatNumber(economy.value, 1)} ${economy.unitLabel}` : '—'}
+          color={dark ? fuelColor.textDark : fuelColor.text}
+        />
+        {avgPricePerLiter != null ? (
+          <MetricRow
+            label={`Preço médio por ${vehicle.fuelUnit}`}
+            value={formatCurrency(avgPricePerLiter, vehicle.currency)}
+          />
+        ) : null}
+        {avgCostPerFill != null ? (
+          <MetricRow
+            label="Custo médio por abastecimento"
+            value={formatCurrency(avgCostPerFill, vehicle.currency)}
+          />
+        ) : null}
+        {costPerKm != null ? (
+          <MetricRow
+            label={`Custo por ${vehicle.odometerUnit}`}
+            value={formatCurrency(costPerKm, vehicle.currency)}
+          />
+        ) : null}
+      </FormSection>
       <View style={styles.consumptionNote}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.noteText}>
           Calculado pelo{' '}
@@ -196,66 +235,46 @@ export default function ReportsScreen() {
           </ThemedText>
         </Pressable>
       </View>
-      {avgPricePerLiter != null && (
-        <StatMini
-          label={`Preço médio por ${vehicle.fuelUnit}`}
-          value={formatCurrency(avgPricePerLiter, vehicle.currency)}
-        />
-      )}
-      {avgCostPerFill != null && (
-        <StatMini
-          label="Custo médio por abastecimento"
-          value={formatCurrency(avgCostPerFill, vehicle.currency)}
-        />
-      )}
-      {costPerKm != null && (
-        <StatMini
-          label={`Custo por ${vehicle.odometerUnit}`}
-          value={formatCurrency(costPerKm, vehicle.currency)}
-        />
-      )}
-      {/* Fuel type breakdown */}
+
       {fuelTypeMap.size > 0 && (
-        <SectionCard title="Por tipo de combustível" accent="fuel" dark={dark}>
+        <FormSection title="Por tipo de combustível">
           {[...fuelTypeMap.entries()].map(([type, data]) => (
-            <View key={type} style={styles.breakdownRow}>
-              <ThemedText type="smallBold">
-                {FUEL_TYPE_LABELS[type] ?? type}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {data.count}x · {formatNumber(data.volume, 1)} {vehicle.fuelUnit} · {formatCurrency(data.cost, vehicle.currency)}
-              </ThemedText>
-            </View>
+            <MetricRow
+              key={type}
+              label={FUEL_TYPE_LABELS[type] ?? type}
+              value={`${data.count}x · ${formatNumber(data.volume, 1)} ${vehicle.fuelUnit}`}
+              detail={formatCurrency(data.cost, vehicle.currency)}
+            />
           ))}
-        </SectionCard>
+        </FormSection>
       )}
 
-      {/* Top maintenance costs */}
       {topMaint.length > 0 && (
-        <SectionCard title="Manutenções mais caras" accent="maintenance" dark={dark}>
+        <FormSection title="Manutenções mais caras">
           {topMaint.map((log) => (
-            <View key={log.id} style={styles.breakdownRow}>
-              <ThemedText type="smallBold">
-                {getMaintenanceLabel(log.maintenanceItemId, log.customTitle)}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {formatDateDisplay(log.date)} · {formatCurrency(log.cost!, vehicle.currency)}
-              </ThemedText>
-            </View>
+            <MetricRow
+              key={log.id}
+              label={getMaintenanceLabel(log.maintenanceItemId, log.customTitle)}
+              value={formatCurrency(log.cost!, vehicle.currency)}
+              detail={formatDateDisplay(log.date)}
+            />
           ))}
-        </SectionCard>
+        </FormSection>
       )}
 
       {fuelLogs.length === 0 && maintLogs.length === 0 && (
-        <ThemedText themeColor="textSecondary">
-          Registre abastecimentos e manutenções para gerar relatórios.
-        </ThemedText>
+        <EmptyState
+          icon="bar-chart-outline"
+          title="Sem dados ainda"
+          subtitle="Registre abastecimentos e manutenções para gerar relatórios."
+          accent={AccentColors.maintenance.solid}
+        />
       )}
     </Screen>
   );
 }
 
-function StatMini({
+function StatTile({
   label,
   value,
   color,
@@ -264,82 +283,117 @@ function StatMini({
   value: string;
   color?: string;
 }) {
+  const theme = useTheme();
   return (
-    <ThemedView type="backgroundElement" style={styles.statMini}>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
+    <View style={[styles.statTile, Shadows.card, { backgroundColor: theme.backgroundElement }]}>
+      <ThemedText type="eyebrow" themeColor="textSecondary">
         {label}
       </ThemedText>
-      <ThemedText type="smallBold" style={color ? { color } : undefined}>
+      <ThemedText type="heading" style={[{ fontSize: 22, lineHeight: 26 }, color ? { color } : undefined]}>
         {value}
       </ThemedText>
-    </ThemedView>
+    </View>
   );
 }
 
-function SectionCard({
-  title,
-  accent,
-  dark,
-  children,
+function MetricRow({
+  label,
+  value,
+  detail,
+  color,
 }: {
-  title: string;
-  accent: keyof typeof AccentColors;
-  dark: boolean;
-  children: React.ReactNode;
+  label: string;
+  value: string;
+  detail?: string;
+  color?: string;
 }) {
-  const colors = AccentColors[accent];
   return (
-    <View
-      style={[
-        styles.sectionCard,
-        {
-          backgroundColor: dark ? colors.surfaceDark : colors.surface,
-          borderColor: dark ? colors.borderDark : colors.border,
-        },
-      ]}>
-      <ThemedText
-        type="smallBold"
-        style={{ color: dark ? colors.textDark : colors.text }}>
-        {title}
+    <View style={styles.metricRow}>
+      <View style={styles.metricText}>
+        <ThemedText type="smallBold">{label}</ThemedText>
+        {detail ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {detail}
+          </ThemedText>
+        ) : null}
+      </View>
+      <ThemedText type="smallBold" style={[{ fontSize: 15 }, color ? { color } : undefined]}>
+        {value}
       </ThemedText>
-      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  splitTrack: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 10,
+    backgroundColor: 'rgba(244, 239, 230, 0.08)',
+  },
+  splitFuel: {
+    backgroundColor: '#F59E0B',
+  },
+  splitMaint: {
+    backgroundColor: '#3B82F6',
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 16,
+  },
+  heroMetaItem: {
+    flex: 1,
+    gap: 4,
+  },
+  heroMetaDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(244, 239, 230, 0.12)',
+  },
+  heroMetaLabel: {
+    color: 'rgba(244, 239, 230, 0.45)',
+  },
+  heroMetaFuel: {
+    color: '#F59E0B',
+    fontSize: 15,
+  },
+  heroMetaMaint: {
+    color: '#60A5FA',
+    fontSize: 15,
+  },
   periodRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.one,
   },
-  cardGrid: {
+  tileRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
   },
-  statMini: {
-    gap: 2,
-    padding: Spacing.three,
-    borderRadius: 12,
-    minWidth: 140,
+  statTile: {
     flex: 1,
-  },
-  statLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  sectionCard: {
-    gap: Spacing.two,
+    gap: 6,
     padding: Spacing.three,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  metricText: {
+    flex: 1,
+    gap: 2,
   },
   consumptionNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -Spacing.two,
+    marginTop: -Spacing.one,
   },
   noteText: {
     fontSize: 12,
@@ -348,8 +402,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textDecorationLine: 'underline',
     color: '#3B82F6',
-  },
-  breakdownRow: {
-    gap: 2,
   },
 });

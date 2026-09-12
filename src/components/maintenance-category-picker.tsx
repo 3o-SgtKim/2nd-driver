@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/app-icon';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColors, Spacing } from '@/constants/theme';
 import {
@@ -55,9 +56,11 @@ export function MaintenanceCategoryPicker({ selectedItemId, onSelect }: Props) {
               </ThemedText>
             )}
           </View>
-          <ThemedText type="small" style={styles.chevronMain}>
-            {open ? '▲' : '▼'}
-          </ThemedText>
+          <AppIcon
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={accentBlue.solid}
+          />
         </View>
       </Pressable>
 
@@ -100,9 +103,11 @@ export function MaintenanceCategoryPicker({ selectedItemId, onSelect }: Props) {
                       style={hasSelection ? styles.groupLabelActive : styles.groupLabel}>
                       {MAINTENANCE_GROUP_LABELS[group]}
                     </ThemedText>
-                    <ThemedText type="small" style={styles.chevron}>
-                      {isExpanded ? '▲' : '▼'}
-                    </ThemedText>
+                    <AppIcon
+                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={14}
+                      color={accentBlue.solid}
+                    />
                   </View>
                 </Pressable>
 

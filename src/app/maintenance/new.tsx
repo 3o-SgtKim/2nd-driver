@@ -1,15 +1,26 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { parseLocaleNumber, toInputNumber } from '@/components/form-utils';
+import { FormHero, FormSection } from '@/components/form-section';
 import { Chip, Field, PrimaryButton, TextField } from '@/components/forms';
 import { MaintenanceCategoryPicker } from '@/components/maintenance-category-picker';
 import { NeedsVehicle } from '@/components/needs-vehicle';
+import { FieldWithPlan } from '@/components/plan-fill-button';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { computeNextDue, displayToIso, formatNumber, getLastOdometer, isoToDisplay, todayDisplayDate, todayIsoDate } from '@/domain/stats';
+import {
+  computeNextDue,
+  displayToIso,
+  formatNumber,
+  getLastOdometer,
+  getScheduleEntry,
+  isoToDisplay,
+  todayDisplayDate,
+  todayIsoDate,
+} from '@/domain/stats';
 import { useGarage } from '@/hooks/use-garage';
 
 export default function NewMaintenanceScreen() {
@@ -37,6 +48,11 @@ export default function NewMaintenanceScreen() {
   }
 
   const isOther = selectedItemId === 'other';
+  const scheduleEntry = getScheduleEntry(
+    garage.vehicle?.maintenanceSchedule,
+    selectedItemId,
+    customTitle,
+  );
 
   async function onSave() {
     if (!selectedItemId) {
@@ -98,31 +114,49 @@ export default function NewMaintenanceScreen() {
     }
   }
 
+  const unit = garage.vehicle?.odometerUnit ?? 'km';
+
   return (
     <Screen>
-      <MaintenanceCategoryPicker
-        selectedItemId={selectedItemId}
-        onSelect={setSelectedItemId}
+      <FormHero
+        eyebrow="Novo registro"
+        title="Manutenção"
+        accent="maintenance"
+        imageUri={garage.vehicle?.photoUri}
+        outlined
+        meta={[
+          {
+            label: 'Último odômetro',
+            value: lastOdo != null ? `${formatNumber(lastOdo)} ${unit}` : 'Sem registro',
+          },
+        ]}
       />
 
-      {isOther && (
-        <Field label="Título do serviço">
-          <TextField
-            value={customTitle}
-            onChangeText={setCustomTitle}
-            placeholder="Descreva o serviço…"
-          />
-        </Field>
-      )}
+      <FormSection title="Serviço">
+        <MaintenanceCategoryPicker
+          selectedItemId={selectedItemId}
+          onSelect={setSelectedItemId}
+        />
+        {isOther ? (
+          <Field label="Título do serviço">
+            <TextField
+              value={customTitle}
+              onChangeText={setCustomTitle}
+              placeholder="Descreva o serviço…"
+            />
+          </Field>
+        ) : null}
+      </FormSection>
 
       {selectedItemId && (
         <>
-          <Field label={`Odômetro (${garage.vehicle?.odometerUnit ?? 'km'})`}>
+          <FormSection title="Registro">
+          <Field label={`Odômetro (${unit})`}>
             <TextField
               value={odometer}
               onChangeText={setOdometer}
               keyboardType="decimal-pad"
-              placeholder={lastOdo != null ? formatNumber(lastOdo) : '45200'}
+              placeholder={lastOdo != null ? `ex.: ${formatNumber(lastOdo)}` : 'ex.: 45200'}
             />
           </Field>
           <Field label="Custo (opcional)">
@@ -130,48 +164,47 @@ export default function NewMaintenanceScreen() {
               value={cost}
               onChangeText={setCost}
               keyboardType="decimal-pad"
-              placeholder="350,00"
+              placeholder="ex.: 350,00"
             />
           </Field>
           <Field label="Próximo odômetro (opcional)">
-            <TextField
-              value={nextDueOdometer}
-              onChangeText={setNextDueOdometer}
-              keyboardType="decimal-pad"
-              placeholder="50200"
-            />
+            <FieldWithPlan
+              showPlan={scheduleEntry != null}
+              onPlan={() => {
+                if (scheduleEntry?.intervalKm == null) {
+                  Alert.alert('Plano', 'Este serviço não tem intervalo de km no plano do veículo.');
+                  return;
+                }
+                const odo = parseLocaleNumber(odometer);
+                const next = computeNextDue(odo ?? 0, todayIsoDate(), scheduleEntry.intervalKm, undefined);
+                if (next.nextOdometer != null) setNextDueOdometer(toInputNumber(next.nextOdometer));
+              }}>
+              <TextField
+                value={nextDueOdometer}
+                onChangeText={setNextDueOdometer}
+                keyboardType="decimal-pad"
+                placeholder="ex.: 50200"
+              />
+            </FieldWithPlan>
           </Field>
           <Field label="Próxima data (opcional, dd/mm/aaaa)">
-            <View style={styles.fieldWithAutoFill}>
-              <View style={styles.fieldInputFlex}>
-                <TextField
-                  value={nextDueDate}
-                  onChangeText={setNextDueDate}
-                  placeholder="20/09/2026"
-                />
-              </View>
-              {(() => {
-                const schedule = garage.vehicle?.maintenanceSchedule;
-                const scheduleKey = isOther && customTitle.trim()
-                  ? `other:${customTitle.trim()}`
-                  : selectedItemId;
-                const entry = schedule?.find((e) => e.maintenanceItemId === scheduleKey);
-                if (!entry) return null;
-                return (
-                  <Pressable
-                    onPress={() => {
-                      const odo = parseLocaleNumber(odometer);
-                      const dateIso = displayToIso(date) ?? todayIsoDate();
-                      const next = computeNextDue(odo ?? 0, dateIso, entry.intervalKm, entry.intervalMonths);
-                      if (next.nextOdometer != null) setNextDueOdometer(toInputNumber(next.nextOdometer));
-                      if (next.nextDateIso) setNextDueDate(isoToDisplay(next.nextDateIso));
-                    }}
-                    style={({ pressed }) => [styles.autoFillBtn, pressed && styles.pressed]}>
-                    <ThemedText type="small" style={styles.autoFillLabel}>⚡ Plano</ThemedText>
-                  </Pressable>
-                );
-              })()}
-            </View>
+            <FieldWithPlan
+              showPlan={scheduleEntry != null}
+              onPlan={() => {
+                if (scheduleEntry?.intervalMonths == null) {
+                  Alert.alert('Plano', 'Este serviço não tem intervalo de tempo no plano do veículo.');
+                  return;
+                }
+                const dateIso = displayToIso(date) ?? todayIsoDate();
+                const next = computeNextDue(0, dateIso, undefined, scheduleEntry.intervalMonths);
+                if (next.nextDateIso) setNextDueDate(isoToDisplay(next.nextDateIso));
+              }}>
+              <TextField
+                value={nextDueDate}
+                onChangeText={setNextDueDate}
+                placeholder="ex.: 20/09/2026"
+              />
+            </FieldWithPlan>
           </Field>
 
           {(nextDueOdometer.trim() || nextDueDate.trim()) && (
@@ -192,13 +225,17 @@ export default function NewMaintenanceScreen() {
             </Field>
           )}
 
+          </FormSection>
+
+          <FormSection title="Detalhes">
           <Field label="Observações">
             <TextField value={notes} onChangeText={setNotes} multiline placeholder="Oficina, peças…" />
           </Field>
 
           <Field label="Data (dd/mm/aaaa)">
-            <TextField value={date} onChangeText={setDate} placeholder="11/09/2026" />
+            <TextField value={date} onChangeText={setDate} placeholder="ex.: 11/09/2026" />
           </Field>
+          </FormSection>
 
           <PrimaryButton
             label={saving ? 'Salvando…' : 'Salvar manutenção'}
@@ -219,29 +256,5 @@ const styles = StyleSheet.create({
   },
   reminderHint: {
     marginTop: 4,
-  },
-  fieldWithAutoFill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  fieldInputFlex: {
-    flex: 1,
-  },
-  autoFillBtn: {
-    backgroundColor: 'rgba(59, 130, 246, 0.10)',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  autoFillLabel: {
-    color: '#3B82F6',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

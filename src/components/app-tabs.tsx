@@ -1,17 +1,18 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Chrome } from '@/constants/theme';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
-
   return (
     <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}
+      backgroundColor={Chrome.surface}
+      indicatorColor="#2A2418"
+      labelStyle={{
+        default: { color: Chrome.faint },
+        selected: { color: '#F59E0B' },
+      }}
+      tintColor="#F59E0B"
+      iconColor={{ default: Chrome.muted, selected: '#F59E0B' }}
       labelVisibilityMode="labeled">
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Início</NativeTabs.Trigger.Label>
@@ -46,7 +47,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="vehicle">
-        <NativeTabs.Trigger.Label>Veículo</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Garagem</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: 'car', selected: 'car.fill' }}
           md="directions_car"

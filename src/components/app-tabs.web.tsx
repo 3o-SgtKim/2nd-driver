@@ -7,12 +7,12 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { AccentColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { AccentColors, Chrome, MaxContentWidth, Spacing } from '@/constants/theme';
 
 type SymbolName = SymbolViewProps['name'];
 
@@ -48,7 +48,7 @@ const TABS: TabConfig[] = [
   },
   {
     name: 'vehicle',
-    label: 'Veículo',
+    label: 'Garagem',
     symbol: { ios: 'car.fill', android: 'directions_car', web: 'directions_car' } as SymbolName,
   },
 ];
@@ -85,15 +85,12 @@ export default function AppTabs() {
 type TabButtonProps = TabTriggerSlotProps & { tab: TabConfig };
 
 export function TabButton({ children, isFocused, tab, ...props }: TabButtonProps) {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
-
   const tintColor =
     isFocused && tab.accentColor
       ? tab.accentColor
       : isFocused
-        ? colors.text
-        : colors.textSecondary;
+        ? '#F59E0B'
+        : Chrome.muted;
 
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
@@ -108,7 +105,7 @@ export function TabButton({ children, isFocused, tab, ...props }: TabButtonProps
 export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
+      <ThemedView type="chrome" style={styles.innerContainer}>
         {props.children}
       </ThemedView>
     </View>

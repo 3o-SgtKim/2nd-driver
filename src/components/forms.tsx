@@ -1,16 +1,16 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import {
-  Pressable,
   StyleSheet,
   TextInput,
-  useColorScheme,
   View,
   type TextInputProps,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
+import { AppIcon } from '@/components/app-icon';
+import { PressableScale } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AccentColors, Spacing } from '@/constants/theme';
+import { AccentColors, Chrome, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type FieldProps = {
@@ -21,7 +21,9 @@ type FieldProps = {
 export function Field({ label, children }: FieldProps) {
   return (
     <View style={styles.field}>
-      <ThemedText type="smallBold">{label}</ThemedText>
+      <ThemedText type="eyebrow" themeColor="textSecondary" style={styles.fieldLabel}>
+        {label}
+      </ThemedText>
       {children}
     </View>
   );
@@ -29,20 +31,35 @@ export function Field({ label, children }: FieldProps) {
 
 export function TextField(props: TextInputProps) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
+  const hasValue = String(props.value ?? '').length > 0;
+
   return (
-    <TextInput
-      placeholderTextColor={theme.textSecondary}
-      {...props}
-      style={[
-        styles.input,
-        {
-          color: theme.text,
-          backgroundColor: theme.backgroundElement,
-          borderColor: theme.backgroundSelected,
-        },
-        props.style,
-      ]}
-    />
+    <View>
+      <TextInput
+        placeholderTextColor={theme.placeholder}
+        {...props}
+        onFocus={(event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        }}
+        style={[
+          styles.input,
+          {
+            color: theme.text,
+            backgroundColor: theme.background,
+            borderColor: focused ? AccentColors.maintenance.solid : theme.backgroundSelected,
+            borderWidth: focused ? 1.5 : 1,
+          },
+          (focused || hasValue) && styles.inputActive,
+          props.style,
+        ]}
+      />
+    </View>
   );
 }
 
@@ -59,19 +76,19 @@ export function PrimaryButton({
   disabled,
   tone = 'primary',
 }: PrimaryButtonProps) {
+  const colors = tone === 'danger' ? (['#DC2626', '#9F1239'] as const) : AccentColors.maintenance.gradient;
+
   return (
-    <Pressable
-      onPress={onPress}
+    <PressableScale
+      onPress={disabled ? undefined : onPress}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.button,
-        tone === 'danger' && styles.danger,
-        (pressed || disabled) && styles.pressed,
-      ]}>
-      <ThemedText type="smallBold" style={styles.buttonLabel}>
-        {label}
-      </ThemedText>
-    </Pressable>
+      style={[disabled && styles.disabled, Shadows.card]}>
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.button}>
+        <ThemedText type="smallBold" style={styles.buttonLabel}>
+          {label}
+        </ThemedText>
+      </LinearGradient>
+    </PressableScale>
   );
 }
 
@@ -84,26 +101,18 @@ type FabButtonProps = {
 };
 
 export function FabButton({ label, onPress, accent }: FabButtonProps) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
   const colors = AccentColors[accent];
 
   return (
     <View style={styles.fabWrapper}>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: colors.solid,
-            shadowColor: colors.solid,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}>
-        <ThemedText type="default" style={styles.fabLabel}>
-          {label}
-        </ThemedText>
-      </Pressable>
+      <PressableScale onPress={onPress} style={Shadows.raised}>
+        <LinearGradient colors={colors.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <AppIcon name="add" size={20} color="#ffffff" />
+          <ThemedText type="default" style={styles.fabLabel}>
+            {label}
+          </ThemedText>
+        </LinearGradient>
+      </PressableScale>
     </View>
   );
 }
@@ -116,57 +125,67 @@ type ChipProps = {
 };
 
 export function Chip({ label, selected, onPress, color }: ChipProps) {
+  const theme = useTheme();
+
+  const backgroundColor =
+    color && selected ? color : selected ? Chrome.surface : theme.background;
+  const textColor = selected ? Chrome.text : theme.textSecondary;
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
-      {color && selected ? (
-        <View style={[styles.chip, { backgroundColor: color }]}>
-          <ThemedText type="small" style={{ color: '#ffffff' }}>
-            {label}
-          </ThemedText>
-        </View>
-      ) : (
-        <ThemedView
-          type={selected ? 'backgroundSelected' : 'backgroundElement'}
-          style={styles.chip}>
-          <ThemedText type="small" themeColor={selected ? 'text' : 'textSecondary'}>
-            {label}
-          </ThemedText>
-        </ThemedView>
-      )}
-    </Pressable>
+    <PressableScale onPress={onPress}>
+      <View
+        style={[
+          styles.chip,
+          { backgroundColor },
+          selected && !color ? styles.chipSelected : undefined,
+        ]}>
+        <ThemedText type="smallBold" style={{ color: textColor }}>
+          {label}
+        </ThemedText>
+      </View>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   field: {
-    gap: Spacing.one,
+    gap: 8,
+  },
+  fieldLabel: {
+    marginLeft: 2,
   },
   input: {
     borderWidth: 1,
-    borderRadius: Spacing.two,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 13,
     fontSize: 16,
+    fontFamily: 'DMSans_500Medium',
+  },
+  inputActive: {
+    paddingTop: 14,
   },
   button: {
-    backgroundColor: '#3c87f7',
-    borderRadius: Spacing.two,
-    paddingVertical: Spacing.three,
+    borderRadius: Radius.md,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  danger: {
-    backgroundColor: '#c62828',
+  disabled: {
+    opacity: 0.55,
   },
   buttonLabel: {
     color: '#ffffff',
-  },
-  pressed: {
-    opacity: 0.7,
+    fontSize: 16,
   },
   chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  chipSelected: {
+    borderColor: 'rgba(244, 239, 230, 0.16)',
   },
   fabWrapper: {
     paddingHorizontal: Spacing.four,
@@ -174,18 +193,16 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   fab: {
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: Radius.lg,
+    paddingVertical: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    flexDirection: 'row',
+    gap: 8,
   },
   fabLabel: {
     color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 17,
+    fontFamily: 'DMSans_700Bold',
+    fontSize: 16,
   },
 });

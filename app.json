@@ -2,7 +2,7 @@
   "expo": {
     "name": "2nd Driver",
     "slug": "2nd-driver",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "seconddriver",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#3C3CDC",
+        "backgroundColor": "#161410",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -29,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#3C3CDC",
+          "backgroundColor": "#161410",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200
         }
@@ -40,8 +40,20 @@
           "icon": "./assets/images/icon.png",
           "color": "#3B82F6"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O 2nd Driver usa suas fotos para a imagem do veículo.",
+          "cameraPermission": "O 2nd Driver usa a câmera para fotografar o veículo.",
+          "microphonePermission": false
+        }
       ]
     ],
+    "extra": {
+      "githubOwner": "3o-SgtKim",
+      "githubRepo": "2nd-driver"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

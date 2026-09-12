@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/app-icon';
 import { parseLocaleNumber, toInputNumber } from '@/components/form-utils';
 import { Chip, Field, PrimaryButton, TextField } from '@/components/forms';
+import { PressableScale } from '@/components/motion';
+import { Cluster } from '@/components/cluster';
+import { FormHero, FormSection } from '@/components/form-section';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { VehiclePhoto } from '@/components/vehicle-photo';
+import { Chrome, Radius, Shadows, Spacing } from '@/constants/theme';
+import { createId } from '@/domain/ids';
 import { formatNumber, tireCorrectionFactor } from '@/domain/stats';
+import { deleteVehiclePhoto, persistVehiclePhoto, pickVehiclePhoto } from '@/storage/vehicle-photo';
 import {
   MAINTENANCE_GROUPS,
   MAINTENANCE_GROUP_LABELS,
@@ -71,27 +78,38 @@ export default function VehicleScreen() {
   // List view
   return (
     <Screen>
-      <ThemedText type="subtitle">Veículos</ThemedText>
-      <ThemedText themeColor="textSecondary">
-        Gerencie seus veículos cadastrados.
-      </ThemedText>
+      <Cluster
+        eyebrow="Garagem"
+        title={String(garage.vehicles.length)}
+        subtitle={garage.vehicles.length === 1 ? 'veículo cadastrado' : 'veículos cadastrados'}
+        accent="maintenance"
+        size="display"
+        imageUri={garage.vehicle?.photoUri}
+      />
 
       <View style={styles.vehicleList}>
         {garage.vehicles.map((v) => {
           const isActive = v.id === garage.selectedVehicleId;
           const displayName = getVehicleDisplayName(v);
+          const nameColor = isActive ? '#F4EFE6' : theme.text;
           return (
             <View
               key={v.id}
               style={[
                 styles.vehicleCard,
-                { backgroundColor: theme.backgroundElement },
-                isActive && styles.vehicleCardActive,
+                Shadows.card,
+                { backgroundColor: isActive ? '#161410' : theme.backgroundElement },
               ]}>
-              <Pressable
+              <PressableScale
                 onPress={() => garage.selectVehicle(v.id)}
-                style={({ pressed }) => [styles.vehicleCardMain, pressed && styles.pressed]}>
-                <Text style={[styles.vehicleName, { color: theme.text }]} numberOfLines={1}>
+                style={styles.vehicleCardMain}>
+                <VehiclePhoto
+                  uri={v.photoUri}
+                  size={48}
+                  radius={14}
+                  iconColor={isActive ? '#60A5FA' : theme.text}
+                />
+                <Text style={[styles.vehicleName, { color: nameColor }]} numberOfLines={1}>
                   {displayName}
                 </Text>
                 {isActive && (
@@ -99,9 +117,9 @@ export default function VehicleScreen() {
                     <Text style={styles.activeBadgeText}>Ativo</Text>
                   </View>
                 )}
-              </Pressable>
+              </PressableScale>
 
-              <View style={[styles.vehicleActions, { borderTopColor: theme.backgroundSelected }]}>
+              <View style={[styles.vehicleActions, { borderTopColor: isActive ? 'rgba(244, 239, 230, 0.12)' : theme.backgroundSelected }]}>
                 <Pressable
                   onPress={() => setEditingId(v.id)}
                   style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}>
@@ -136,7 +154,7 @@ export default function VehicleScreen() {
       </View>
 
       <PrimaryButton
-        label="+ Adicionar veículo"
+        label="Adicionar veículo"
         onPress={() => setCreatingNew(true)}
       />
     </Screen>
@@ -161,6 +179,7 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
   const [odometerUnit, setOdometerUnit] = useState<OdometerUnit>('km');
   const [fuelUnit, setFuelUnit] = useState<FuelUnit>('L');
   const [currency, setCurrency] = useState('BRL');
+  const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -189,6 +208,7 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
       setOdometerUnit(existing.odometerUnit);
       setFuelUnit(existing.fuelUnit);
       setCurrency(existing.currency);
+      setPhotoUri(existing.photoUri);
       if (existing.tireCorrection) {
         const tc = existing.tireCorrection;
         setOldWidth(String(tc.oldWidth));
@@ -240,8 +260,10 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
     if (!showSchedule) return undefined;
     const result: MaintenanceScheduleEntry[] = [];
     for (const [itemId, entry] of Object.entries(scheduleEntries)) {
-      const km = entry.km.trim() ? parseLocaleNumber(entry.km) : null;
-      const months = entry.months.trim() ? parseLocaleNumber(entry.months) : null;
+      const kmRaw = entry.km?.trim() ?? '';
+      const monthsRaw = entry.months?.trim() ?? '';
+      const km = kmRaw ? parseLocaleNumber(kmRaw) : null;
+      const months = monthsRaw ? parseLocaleNumber(monthsRaw) : null;
       if (km != null || months != null) {
         result.push({
           maintenanceItemId: itemId,
@@ -277,6 +299,14 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
 
     setSaving(true);
     try {
+      const id = existing?.id ?? createId('veh');
+      let nextPhoto = photoUri;
+      if (photoUri && photoUri !== existing?.photoUri) {
+        nextPhoto = await persistVehiclePhoto(photoUri, id);
+      }
+      if (existing?.photoUri && existing.photoUri !== nextPhoto) {
+        await deleteVehiclePhoto(existing.photoUri);
+      }
       const vehicleData = {
         make: trimmedMake || undefined,
         model: trimmedModel || undefined,
@@ -286,11 +316,12 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
         currency: currency.trim() || 'BRL',
         tireCorrection: tireCorr,
         maintenanceSchedule: parseMaintenanceSchedule(),
+        photoUri: nextPhoto,
       };
       if (existing?.id) {
-        await garage.updateVehicle({ ...vehicleData, id: existing.id });
+        await garage.updateVehicle({ ...vehicleData, id });
       } else {
-        await garage.addVehicle(vehicleData);
+        await garage.addVehicle({ ...vehicleData, id });
       }
       Alert.alert('Pronto', 'Veículo salvo.');
       onDone();
@@ -304,7 +335,11 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
   function updateScheduleEntry(itemId: string, field: 'km' | 'months', value: string) {
     setScheduleEntries((prev) => ({
       ...prev,
-      [itemId]: { ...prev[itemId], [field]: value },
+      [itemId]: {
+        km: prev[itemId]?.km ?? '',
+        months: prev[itemId]?.months ?? '',
+        [field]: value,
+      },
     }));
   }
 
@@ -314,16 +349,55 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
     <Screen>
       {/* Back button when editing from list */}
       {garage.vehicles.length > 0 && (
-        <Pressable onPress={onDone} style={({ pressed }) => pressed && styles.pressed}>
-          <ThemedText type="small" style={styles.backText}>← Voltar</ThemedText>
-        </Pressable>
+        <PressableScale onPress={onDone} style={styles.backRow}>
+          <AppIcon name="chevron-back" size={18} color="#3B82F6" />
+          <ThemedText type="small" style={styles.backText}>Voltar</ThemedText>
+        </PressableScale>
       )}
 
-      <ThemedText type="subtitle">{isNew ? 'Novo veículo' : 'Editar veículo'}</ThemedText>
+      <FormHero
+        eyebrow={isNew ? 'Novo cadastro' : 'Editar'}
+        title={isNew ? 'Novo veículo' : 'Editar veículo'}
+        accent="maintenance"
+        imageUri={photoUri}
+        meta={
+          existing
+            ? [{ label: 'Veículo', value: getVehicleDisplayName(existing) }]
+            : undefined
+        }
+      />
       <ThemedText themeColor="textSecondary">
         {isNew ? 'Cadastre os dados do seu veículo.' : 'Altere os dados do veículo.'}
       </ThemedText>
 
+      <PressableScale
+        onPress={async () => {
+          const uri = await pickVehiclePhoto();
+          if (uri) setPhotoUri(uri);
+        }}
+        style={[styles.photoCard, Shadows.card, { backgroundColor: theme.backgroundElement }]}>
+        {photoUri ? (
+          <VehiclePhoto uri={photoUri} size={0} radius={18} />
+        ) : (
+          <View style={styles.photoEmpty}>
+            <AppIcon name="camera-outline" size={22} color="#60A5FA" />
+            <ThemedText type="smallBold">Adicionar foto do veículo</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Galeria ou câmera
+            </ThemedText>
+          </View>
+        )}
+        {photoUri ? (
+          <Pressable
+            onPress={() => setPhotoUri(undefined)}
+            style={styles.photoRemove}
+            hitSlop={8}>
+            <AppIcon name="close" size={14} color={Chrome.text} />
+          </Pressable>
+        ) : null}
+      </PressableScale>
+
+      <FormSection title="Identidade">
       <Field label="Marca">
         <TextField value={make} onChangeText={setMake} placeholder="Ex.: Honda" />
       </Field>
@@ -333,7 +407,9 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
       <Field label="Ano">
         <TextField value={year} onChangeText={setYear} placeholder="Ex.: 2018" keyboardType="number-pad" />
       </Field>
+      </FormSection>
 
+      <FormSection title="Unidades">
       <Field label="Unidade do odômetro">
         <View style={styles.chips}>
           <Chip label="km" selected={odometerUnit === 'km'} onPress={() => setOdometerUnit('km')} />
@@ -349,8 +425,9 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
       </Field>
 
       <Field label="Moeda">
-        <TextField value={currency} onChangeText={setCurrency} placeholder="BRL" autoCapitalize="characters" />
+        <TextField value={currency} onChangeText={setCurrency} placeholder="ex.: BRL" autoCapitalize="characters" />
       </Field>
+      </FormSection>
 
       {/* ───── Tire correction section ───── */}
       <ThemedView type="backgroundElement" style={styles.collapsibleSection}>
@@ -375,9 +452,11 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
                 Fator: {factor.toFixed(4)} ({Number(correctionPercent) >= 0 ? '+' : ''}{correctionPercent}%)
               </ThemedText>
             )}
-            <ThemedText type="small" style={styles.chevron}>
-              {tireExpanded ? '▲' : '▼'}
-            </ThemedText>
+            <AppIcon
+              name={tireExpanded ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color={theme.textSecondary}
+            />
           </View>
         </Pressable>
 
@@ -394,15 +473,15 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
                 <View style={styles.tireRow}>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Largura (mm)</ThemedText>
-                    <TextField value={oldWidth} onChangeText={setOldWidth} keyboardType="decimal-pad" placeholder="195" style={styles.smallInput} />
+                    <TextField value={oldWidth} onChangeText={setOldWidth} keyboardType="decimal-pad" placeholder="ex.: 195" style={styles.smallInput} />
                   </View>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Perfil (%)</ThemedText>
-                    <TextField value={oldAspect} onChangeText={setOldAspect} keyboardType="decimal-pad" placeholder="65" style={styles.smallInput} />
+                    <TextField value={oldAspect} onChangeText={setOldAspect} keyboardType="decimal-pad" placeholder="ex.: 65" style={styles.smallInput} />
                   </View>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Aro (pol.)</ThemedText>
-                    <TextField value={oldRim} onChangeText={setOldRim} keyboardType="decimal-pad" placeholder="15" style={styles.smallInput} />
+                    <TextField value={oldRim} onChangeText={setOldRim} keyboardType="decimal-pad" placeholder="ex.: 15" style={styles.smallInput} />
                   </View>
                 </View>
 
@@ -410,15 +489,15 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
                 <View style={styles.tireRow}>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Largura (mm)</ThemedText>
-                    <TextField value={newWidth} onChangeText={setNewWidth} keyboardType="decimal-pad" placeholder="205" style={styles.smallInput} />
+                    <TextField value={newWidth} onChangeText={setNewWidth} keyboardType="decimal-pad" placeholder="ex.: 205" style={styles.smallInput} />
                   </View>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Perfil (%)</ThemedText>
-                    <TextField value={newAspect} onChangeText={setNewAspect} keyboardType="decimal-pad" placeholder="55" style={styles.smallInput} />
+                    <TextField value={newAspect} onChangeText={setNewAspect} keyboardType="decimal-pad" placeholder="ex.: 55" style={styles.smallInput} />
                   </View>
                   <View style={styles.tireField}>
                     <ThemedText type="small" themeColor="textSecondary">Aro (pol.)</ThemedText>
-                    <TextField value={newRim} onChangeText={setNewRim} keyboardType="decimal-pad" placeholder="16" style={styles.smallInput} />
+                    <TextField value={newRim} onChangeText={setNewRim} keyboardType="decimal-pad" placeholder="ex.: 16" style={styles.smallInput} />
                   </View>
                 </View>
 
@@ -459,12 +538,14 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
             </View>
             {showSchedule && (
               <ThemedText type="small" themeColor="textSecondary">
-                {Object.values(scheduleEntries).filter((e) => e.km.trim() || e.months.trim()).length} itens configurados
+                {Object.values(scheduleEntries).filter((e) => e.km?.trim() || e.months?.trim()).length} itens configurados
               </ThemedText>
             )}
-            <ThemedText type="small" style={styles.chevron}>
-              {scheduleExpanded ? '▲' : '▼'}
-            </ThemedText>
+            <AppIcon
+              name={scheduleExpanded ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color={theme.textSecondary}
+            />
           </View>
         </Pressable>
 
@@ -481,7 +562,7 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
               const isExpanded = scheduleExpandedGroup === group;
               const filledCount = items.filter((item) => {
                 const e = scheduleEntries[item.id];
-                return e && (e.km.trim() || e.months.trim());
+                return e && (e.km?.trim() || e.months?.trim());
               }).length;
 
               return (
@@ -515,7 +596,7 @@ function VehicleForm({ garage, theme, vehicle: existing, onDone }: VehicleFormPr
               const isExpanded = scheduleExpandedGroup === groupKey;
               const filledCount = customTitles.filter((t) => {
                 const e = scheduleEntries[`other:${t}`];
-                return e && (e.km.trim() || e.months.trim());
+                return e && (e.km?.trim() || e.months?.trim());
               }).length;
               return (
                 <ScheduleGroup
@@ -572,9 +653,11 @@ function ScheduleGroup({ label, isExpanded, filledCount, onToggle, items, onUpda
                 {filledCount}
               </ThemedText>
             )}
-            <ThemedText type="small" themeColor="textSecondary">
-              {isExpanded ? '▲' : '▼'}
-            </ThemedText>
+            <AppIcon
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color="#B4AFA4"
+            />
           </View>
         </View>
       </Pressable>
@@ -591,7 +674,7 @@ function ScheduleGroup({ label, isExpanded, filledCount, onToggle, items, onUpda
                 value={item.entry.km}
                 onChangeText={(v) => onUpdate(item.id, 'km', v)}
                 keyboardType="number-pad"
-                placeholder="10000"
+                placeholder="ex.: 10000"
                 style={styles.smallInput}
               />
             </View>
@@ -603,7 +686,7 @@ function ScheduleGroup({ label, isExpanded, filledCount, onToggle, items, onUpda
                 value={item.entry.months}
                 onChangeText={(v) => onUpdate(item.id, 'months', v)}
                 keyboardType="number-pad"
-                placeholder="12"
+                placeholder="ex.: 12"
                 style={styles.smallInput}
               />
             </View>
@@ -615,16 +698,34 @@ function ScheduleGroup({ label, isExpanded, filledCount, onToggle, items, onUpda
 }
 
 const styles = StyleSheet.create({
+  photoCard: {
+    height: 168,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  photoEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(12, 10, 8, 0.62)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   vehicleList: {
     gap: Spacing.two,
   },
   vehicleCard: {
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  vehicleCardActive: {
-    borderColor: 'rgba(59, 130, 246, 0.4)',
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
   },
   vehicleCardMain: {
     flexDirection: 'row',
@@ -667,10 +768,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'flex-start',
+  },
   backText: {
     color: '#3B82F6',
     fontWeight: '600',
-    marginBottom: Spacing.one,
   },
   chips: {
     flexDirection: 'row',

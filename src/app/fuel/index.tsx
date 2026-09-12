@@ -1,13 +1,16 @@
-import { Link, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
+import { Cluster } from '@/components/cluster';
+import { EmptyState } from '@/components/empty-state';
 import { FabButton } from '@/components/forms';
 import { LogRow } from '@/components/log-row';
+import { FadeIn } from '@/components/motion';
 import { NeedsVehicle } from '@/components/needs-vehicle';
+import { PageHeader } from '@/components/page-header';
 import { Screen } from '@/components/screen';
-import { ThemedText } from '@/components/themed-text';
 import { VehicleSelector } from '@/components/vehicle-selector';
-import { Spacing } from '@/constants/theme';
+import { AccentColors, Spacing } from '@/constants/theme';
 import { formatCurrency, formatDateDisplay, formatNumber } from '@/domain/stats';
 import { FUEL_TYPE_LABELS } from '@/domain/types';
 import { useGarage } from '@/hooks/use-garage';
@@ -29,7 +32,7 @@ export default function FuelListScreen() {
   if (!garage.vehicle) {
     return (
       <Screen>
-        <ThemedText type="subtitle">Combustível</ThemedText>
+        <PageHeader title="Combustível" subtitle="Cadastre um veículo para começar." />
         <NeedsVehicle />
       </Screen>
     );
@@ -52,30 +55,46 @@ export default function FuelListScreen() {
 
   return (
     <Screen topHeader={<VehicleSelector />}>
-      <ThemedText type="subtitle">Combustível</ThemedText>
+      <Cluster
+        eyebrow="Registros"
+        title="Combustível"
+        accent="fuel"
+        imageUri={garage.vehicle.photoUri}
+        outlined
+        meta={[
+          {
+            label: 'Neste veículo',
+            value: `${logs.length} abastecimento${logs.length === 1 ? '' : 's'}`,
+          },
+        ]}
+      />
 
       {logs.length === 0 ? (
-        <ThemedText themeColor="textSecondary">
-          Nenhum abastecimento registrado.
-        </ThemedText>
+        <EmptyState
+          icon="water-outline"
+          title="Nenhum abastecimento"
+          subtitle="Toque no botão abaixo para registrar o primeiro."
+          accent={AccentColors.fuel.solid}
+        />
       ) : (
         <View style={styles.list}>
-          {logs.map((log) => (
-            <LogRow
-              key={log.id}
-              accent="fuel"
-              title={`${formatDateDisplay(log.date)} · ${FUEL_TYPE_LABELS[log.fuelType] ?? log.fuelType}`}
-              subtitle={`${formatNumber(log.odometer)} ${unit} · ${formatNumber(log.volume, 1)} ${fuelUnit}${log.isFullTank ? ' · tanque cheio' : ''}`}
-              meta={formatCurrency(log.totalCost, garage.vehicle!.currency)}
-              onPress={() => router.push(`/fuel/${log.id}`)}
-              onDelete={() => confirmDelete(log.id)}
-            />
+          {logs.map((log, index) => (
+            <FadeIn key={log.id} delay={index * 40}>
+              <LogRow
+                accent="fuel"
+                title={`${formatDateDisplay(log.date)} · ${FUEL_TYPE_LABELS[log.fuelType] ?? log.fuelType}`}
+                subtitle={`${formatNumber(log.odometer)} ${unit} · ${formatNumber(log.volume, 1)} ${fuelUnit}${log.isFullTank ? ' · tanque cheio' : ''}`}
+                meta={formatCurrency(log.totalCost, garage.vehicle!.currency)}
+                onPress={() => router.push(`/fuel/${log.id}`)}
+                onDelete={() => confirmDelete(log.id)}
+              />
+            </FadeIn>
           ))}
         </View>
       )}
 
       <FabButton
-        label="+ Novo abastecimento"
+        label="Novo abastecimento"
         accent="fuel"
         onPress={() => router.push('/fuel/new')}
       />

@@ -1,7 +1,10 @@
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/app-icon';
+import { PressableScale } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColors, Spacing } from '@/constants/theme';
+import { AccentColors, Radius, Shadows, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 type AccentKey = keyof typeof AccentColors;
 
@@ -15,68 +18,43 @@ type LogRowProps = {
 };
 
 export function LogRow({ title, subtitle, meta, accent, onPress, onDelete }: LogRowProps) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
+  const theme = useTheme();
   const accentTheme = accent ? AccentColors[accent] : null;
-
-  const rowBg = accentTheme
-    ? dark
-      ? accentTheme.surfaceDark
-      : accentTheme.surface
-    : undefined;
-  const rowBorder = accentTheme
-    ? dark
-      ? accentTheme.borderDark
-      : accentTheme.border
-    : undefined;
+  const iconName = accent === 'maintenance' ? 'construct-outline' : 'water-outline';
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => pressed && styles.pressed}>
-      <View
-        style={[
-          styles.row,
-          rowBg ? { backgroundColor: rowBg } : undefined,
-          rowBorder ? { borderWidth: 1, borderColor: rowBorder } : undefined,
-        ]}>
-        {accent && (
-          <View
-            style={[
-              styles.accentStrip,
-              { backgroundColor: accentTheme!.solid },
-            ]}
-          />
-        )}
+    <PressableScale onPress={onPress} style={Shadows.card}>
+      <View style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
+        {accentTheme ? (
+          <View style={[styles.iconWell, { backgroundColor: accentTheme.surface }]}>
+            <AppIcon name={iconName} size={18} color={accentTheme.solid} />
+          </View>
+        ) : null}
         <View style={styles.textBlock}>
-          <ThemedText type="smallBold">{title}</ThemedText>
+          <ThemedText type="smallBold" style={styles.title}>
+            {title}
+          </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {subtitle}
           </ThemedText>
         </View>
         {meta ? (
           <ThemedText
-            type="smallBold"
+            type="heading"
             style={[
               styles.meta,
-              accentTheme
-                ? { color: dark ? accentTheme.textDark : accentTheme.text }
-                : undefined,
+              accentTheme ? { color: accentTheme.solid } : undefined,
             ]}>
             {meta}
           </ThemedText>
         ) : null}
         {onDelete && (
-          <Pressable
-            onPress={onDelete}
-            hitSlop={8}
-            style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}>
-            <ThemedText style={styles.deleteIcon}>✕</ThemedText>
-          </Pressable>
+          <PressableScale onPress={onDelete} style={styles.deleteBtn}>
+            <AppIcon name="close" size={14} color="#DC2626" />
+          </PressableScale>
         )}
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -85,43 +63,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingRight: Spacing.two,
-    paddingVertical: Spacing.three,
-    borderRadius: 12,
-    overflow: 'hidden',
+    paddingRight: 12,
+    paddingLeft: 12,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
   },
-  accentStrip: {
-    width: 4,
-    alignSelf: 'stretch',
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
+  iconWell: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textBlock: {
     flex: 1,
-    gap: Spacing.half,
-    paddingLeft: Spacing.two,
+    gap: 2,
+  },
+  title: {
+    fontSize: 15,
   },
   meta: {
     textAlign: 'right',
-  },
-  pressed: {
-    opacity: 0.75,
+    fontSize: 20,
+    lineHeight: 22,
   },
   deleteBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(198, 40, 40, 0.12)',
+    backgroundColor: 'rgba(220, 38, 38, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: Spacing.one,
-  },
-  deleteBtnPressed: {
-    backgroundColor: 'rgba(198, 40, 40, 0.25)',
-  },
-  deleteIcon: {
-    color: '#c62828',
-    fontSize: 13,
-    fontWeight: '700',
+    marginLeft: 4,
   },
 });

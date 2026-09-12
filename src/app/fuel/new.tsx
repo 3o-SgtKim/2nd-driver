@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { parseLocaleNumber } from '@/components/form-utils';
+import { FormHero, FormSection } from '@/components/form-section';
 import { Chip, Field, PrimaryButton, TextField } from '@/components/forms';
 import { NeedsVehicle } from '@/components/needs-vehicle';
 import { Screen } from '@/components/screen';
-import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { displayToIso, formatNumber, getLastOdometer, todayDisplayDate } from '@/domain/stats';
 import { FUEL_TYPE_LABELS, type FuelType } from '@/domain/types';
@@ -78,66 +78,85 @@ export default function NewFuelScreen() {
     }
   }
 
+  const unit = garage.vehicle?.odometerUnit ?? 'km';
+
   return (
     <Screen>
-      <Field label={`Odômetro (${garage.vehicle?.odometerUnit ?? 'km'})`}>
-        <TextField
-          value={odometer}
-          onChangeText={setOdometer}
-          keyboardType="decimal-pad"
-          placeholder={lastOdo != null ? formatNumber(lastOdo) : '45200'}
-        />
-      </Field>
+      <FormHero
+        eyebrow="Novo registro"
+        title="Abastecimento"
+        accent="fuel"
+        imageUri={garage.vehicle?.photoUri}
+        outlined
+        meta={[
+          {
+            label: 'Último odômetro',
+            value: lastOdo != null ? `${formatNumber(lastOdo)} ${unit}` : 'Sem registro',
+          },
+        ]}
+      />
 
-      <Field label="Tipo de combustível">
-        <View style={styles.chips}>
-          {FUEL_TYPES.map((type) => (
-            <Chip
-              key={type}
-              label={FUEL_TYPE_LABELS[type]}
-              selected={fuelType === type}
-              onPress={() => setFuelType(type)}
-            />
-          ))}
-        </View>
-      </Field>
+      <FormSection title="Leitura">
+        <Field label={`Odômetro (${unit})`}>
+          <TextField
+            value={odometer}
+            onChangeText={setOdometer}
+            keyboardType="decimal-pad"
+            placeholder={lastOdo != null ? `ex.: ${formatNumber(lastOdo)}` : 'ex.: 45200'}
+          />
+        </Field>
+      </FormSection>
 
-      <Field label={`Volume (${garage.vehicle?.fuelUnit ?? 'L'})`}>
-        <TextField
-          value={volume}
-          onChangeText={setVolume}
-          keyboardType="decimal-pad"
-          placeholder="40,5"
-        />
-      </Field>
-      <Field label="Valor total">
-        <TextField
-          value={totalCost}
-          onChangeText={setTotalCost}
-          keyboardType="decimal-pad"
-          placeholder="250,00"
-        />
-      </Field>
+      <FormSection title="Abastecimento">
+        <Field label="Tipo de combustível">
+          <View style={styles.chips}>
+            {FUEL_TYPES.map((type) => (
+              <Chip
+                key={type}
+                label={FUEL_TYPE_LABELS[type]}
+                selected={fuelType === type}
+                onPress={() => setFuelType(type)}
+              />
+            ))}
+          </View>
+        </Field>
+        <Field label={`Volume (${garage.vehicle?.fuelUnit ?? 'L'})`}>
+          <TextField
+            value={volume}
+            onChangeText={setVolume}
+            keyboardType="decimal-pad"
+            placeholder="ex.: 40,5"
+          />
+        </Field>
+        <Field label="Valor total">
+          <TextField
+            value={totalCost}
+            onChangeText={setTotalCost}
+            keyboardType="decimal-pad"
+            placeholder="ex.: 250,00"
+          />
+        </Field>
+        <Field label="Tanque cheio?">
+          <View style={styles.chips}>
+            <Chip label="Sim" selected={isFullTank} onPress={() => setIsFullTank(true)} />
+            <Chip label="Não" selected={!isFullTank} onPress={() => setIsFullTank(false)} />
+          </View>
+        </Field>
+      </FormSection>
 
-      <Field label="Tanque cheio?">
-        <View style={styles.chips}>
-          <Chip label="Sim" selected={isFullTank} onPress={() => setIsFullTank(true)} />
-          <Chip label="Não" selected={!isFullTank} onPress={() => setIsFullTank(false)} />
-        </View>
-      </Field>
-
-      <Field label="Observações">
-        <TextField
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Posto, observações…"
-          multiline
-        />
-      </Field>
-
-      <Field label="Data (dd/mm/aaaa)">
-        <TextField value={date} onChangeText={setDate} placeholder="11/09/2026" />
-      </Field>
+      <FormSection title="Detalhes">
+        <Field label="Observações">
+          <TextField
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Posto, observações…"
+            multiline
+          />
+        </Field>
+        <Field label="Data (dd/mm/aaaa)">
+          <TextField value={date} onChangeText={setDate} placeholder="ex.: 11/09/2026" />
+        </Field>
+      </FormSection>
 
       <PrimaryButton label={saving ? 'Salvando…' : 'Salvar abastecimento'} onPress={onSave} disabled={saving} />
     </Screen>

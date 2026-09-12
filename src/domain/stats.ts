@@ -1,4 +1,4 @@
-import type { FuelLog, MaintenanceLog, TireCorrection, Vehicle } from './types';
+import type { FuelLog, MaintenanceLog, MaintenanceScheduleEntry, TireCorrection, Vehicle } from './types';
 import { getMaintenanceLabel } from './types';
 
 export function getLastOdometer(state: { fuelLogs: FuelLog[]; maintenanceLogs: MaintenanceLog[] }): number | null {
@@ -191,6 +191,17 @@ export function getAllNextServices(
   });
 }
 
+/** 0–1 progress from last service odometer toward nextDueOdometer. */
+export function getMaintenanceProgress(
+  log: MaintenanceLog,
+  lastOdometer: number | null
+): number | null {
+  if (log.nextDueOdometer == null || lastOdometer == null) return null;
+  const span = log.nextDueOdometer - log.odometer;
+  if (span <= 0) return lastOdometer >= log.nextDueOdometer ? 1 : 0;
+  return Math.min(1, Math.max(0, (lastOdometer - log.odometer) / span));
+}
+
 export function formatNumber(value: number, digits = 0): string {
   return value.toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
@@ -277,4 +288,19 @@ export function computeNextDue(
     result.nextDateIso = `${y}-${m}-${day}`;
   }
   return result;
+}
+
+export function getScheduleEntry(
+  schedule: MaintenanceScheduleEntry[] | undefined,
+  selectedItemId: string | null,
+  customTitle = '',
+): MaintenanceScheduleEntry | undefined {
+  if (!schedule || !selectedItemId) {
+    return undefined;
+  }
+  const key =
+    selectedItemId === 'other' && customTitle.trim()
+      ? `other:${customTitle.trim()}`
+      : selectedItemId;
+  return schedule.find((entry) => entry.maintenanceItemId === key);
 }

@@ -105,6 +105,7 @@ export type Vehicle = {
   currency: string;
   tireCorrection?: TireCorrection;
   maintenanceSchedule?: MaintenanceScheduleEntry[];
+  photoUri?: string;
 };
 
 export function getVehicleDisplayName(v: Vehicle): string {

@@ -22,6 +22,7 @@ import {
   type Vehicle,
 } from '@/domain/types';
 import { loadGarage, saveGarage } from '@/storage/garage-repository';
+import { deleteVehiclePhoto } from '@/storage/vehicle-photo';
 
 type VehicleInput = Omit<Vehicle, 'id'> & { id?: string };
 type FuelInput = Omit<FuelLog, 'id' | 'vehicleId'> & { id?: string };
@@ -125,7 +126,7 @@ export function GarageProvider({ children }: { children: ReactNode }) {
       const v: Vehicle = { ...input };
       await persist({
         ...state,
-        vehicles: state.vehicles.map((old) => (old.id === v.id ? v : old)),
+        vehicles: state.vehicles.map((old) => (old.id === v.id ? { ...old, ...v } : old)),
       });
       return v;
     },
@@ -134,6 +135,8 @@ export function GarageProvider({ children }: { children: ReactNode }) {
 
   const deleteVehicle = useCallback(
     async (id: string) => {
+      const doomed = state.vehicles.find((v) => v.id === id);
+      await deleteVehiclePhoto(doomed?.photoUri);
       const remaining = state.vehicles.filter((v) => v.id !== id);
       const newSelected =
         state.selectedVehicleId === id
